@@ -36,6 +36,29 @@ function! test#strategy#asyncrun(cmd) abort
   execute 'AsyncRun '.a:cmd
 endfunction
 
+function! test#strategy#asyncrun_setup_unlet_global_autocmd() abort
+  if !exists('#asyncrun_background#User#AsynRunStop')
+    augroup asyncrun_background
+      autocmd!
+      autocmd User AsyncRunStop if exists('g:test#strategy#cmd') | unlet g:test#strategy#cmd | endif
+    augroup END
+  endif
+endfunction
+
+function! test#strategy#asyncrun_background(cmd) abort
+  let g:test#strategy#cmd = a:cmd
+  call test#strategy#asyncrun_setup_unlet_global_autocmd()
+  execute 'AsyncRun -mode=async -silent -post=echo\ eval("g:asyncrun_code\ ?\"Failure\":\"Success\"").":"'
+          \ .'\ substitute(g:test\#strategy\#cmd,\ "\\",\ "",\ "") '.a:cmd
+endfunction
+
+function! test#strategy#asyncrun_background_term(cmd) abort
+  let g:test#strategy#cmd = a:cmd
+  call test#strategy#asyncrun_setup_unlet_global_autocmd()
+  execute 'AsyncRun -mode=term -pos=tab -focus=0 -post=echo\ eval("g:asyncrun_code\ ?\"Failure\":\"Success\"").":"'
+          \ .'\ substitute(g:test\#strategy\#cmd,\ "\\",\ "",\ "") '.a:cmd
+endfunction
+
 function! test#strategy#dispatch(cmd) abort
   execute 'Dispatch '.a:cmd
 endfunction
@@ -96,6 +119,20 @@ function! test#strategy#slimux(cmd) abort
   else
     call SlimuxSendCommand(s:command(a:cmd))
   endif
+endfunction
+
+function! test#strategy#tmuxify(cmd) abort
+  call tmuxify#pane_send_raw('C-u', '!')
+  call tmuxify#pane_send_raw('q', '!')
+  call tmuxify#pane_send_raw('C-u', '!')
+
+  if exists('g:test#preserve_screen') && !g:test#preserve_screen
+    call tmuxify#pane_send_raw('C-u', '!')
+    call tmuxify#pane_send_raw('C-l', '!')
+    call tmuxify#pane_send_raw('C-u', '!')
+  endif
+
+  call tmuxify#pane_run('!', s:command(a:cmd))
 endfunction
 
 function! test#strategy#vimshell(cmd) abort
